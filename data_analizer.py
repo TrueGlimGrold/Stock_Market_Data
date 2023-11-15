@@ -63,11 +63,6 @@ data = pd.DataFrame(titled_columns)
 
 unique_filenames = data['filename'].unique()
 
-# Create a progress bar for file processing
-widgets_files = [progressbar.Percentage(), ' ', progressbar.Counter(), ' ',
-                    progressbar.Bar(), ' ', progressbar.Timer(), ' ']
-progress_bar_files = progressbar.ProgressBar(widgets=widgets_files, maxval=len(unique_filenames)).start()
-
 # List to store results for each file
 all_results = []
 
@@ -107,7 +102,87 @@ def analize_streaks(df):
     # print(f"Analyzed {df['filename'].iloc[0]}")
     return patterns
 
-# ! Pre analysis of data
+# ! First analysis of data
+
+# Define percentiles for categorization
+percentiles = [0, 1, 10, 30, 50, 70, 90, 99, 100]
+
+# Scale percentiles to be in the range [0, 1]
+scaled_percentiles = [p / 100 for p in percentiles]
+
+# Replace non-numeric values in the 'open' column with NaN
+data['open'] = pd.to_numeric(data['open'], errors='coerce')
+
+# Define percentiles for categorization
+percentiles = [0, 1, 10, 30, 50, 70, 90, 99, 100]
+
+# Scale percentiles to be in the range [0, 1]
+scaled_percentiles = [p / 100 for p in percentiles]
+
+# Replace non-numeric values in the 'open' column with NaN
+data['open'] = pd.to_numeric(data['open'], errors='coerce')
+
+# Check if there are any non-numeric values in the 'open' column
+if data['open'].notna().all():
+    # Check if there are enough non-NaN values to perform the calculation
+    if len(data['open'].dropna()) > 1:
+        # Calculate percentage increase only if there are enough non-NaN values
+        data['percentage_increase'] = (data['open'].shift(-252) - data['open']) / (data['open'] + 1e-8) * 100
+
+        # Drop NaN values from the 'percentage_increase' column
+        data['percentage_increase'].dropna(inplace=True)
+
+        # Check if there are enough non-NaN values to perform quantile calculation
+        if len(data['percentage_increase']) > 1:
+            # Calculate quantiles
+            quantiles = data['percentage_increase'].quantile(q=scaled_percentiles, interpolation='linear')
+
+            # Remove duplicate quantile values
+            quantiles = quantiles[~quantiles.duplicated()]
+
+            # Ensure there are enough unique quantiles
+            if len(quantiles) < len(scaled_percentiles) - 1:
+                print("Not enough unique quantiles.")
+            else:
+                # Categorize stocks based on reversed percentiles for all files
+                data['percentile_category'] = pd.cut(
+                    data['percentage_increase'],
+                    bins=quantiles,
+                    labels=[
+                        f'Top {100 - p*100}%' if p > 0 else f'Bottom {-p*100}%'
+                        for p in scaled_percentiles[:-1]
+                    ]
+                )
+
+                # Group by percentile category and calculate average percentage increase
+                result = data.groupby('percentile_category', observed=False)['percentage_increase'].mean()
+
+                # Print the combined result
+                print("Average Result:")
+                for category, value in zip(result.index, result):
+                    print(f"{category}: {value}")
+                    
+                # Group by percentile category and calculate median percentage increase
+                result = data.groupby('percentile_category', observed=False)['percentage_increase'].median()
+
+                # Print the combined result
+                print("Median Result:")
+                for category, value in zip(result.index, result):
+                    print(f"{category}: {value}")
+        else:
+            print("Not enough non-NaN values for percentage increase.")
+    else:
+        print("Not enough non-NaN values for 'open' column.")
+else:
+    print("Some non-numeric values in the 'open' column.")
+    
+    
+# Create a progress bar for file processing
+widgets_files = [progressbar.Percentage(), ' ', progressbar.Counter(), ' ',
+                    progressbar.Bar(), ' ', progressbar.Timer(), ' ']
+progress_bar_files = progressbar.ProgressBar(widgets=widgets_files, maxval=len(unique_filenames)).start()
+
+# ! Second analysis of data
 
 for idx, filename in enumerate(data['filename'].unique()):
     df = data[data['filename'] == filename].reset_index(drop=True)
@@ -128,97 +203,7 @@ sorted_data = data.sort_values(by='open', ascending=False)
 # Display the sorted results
 print(sorted_data[['filename', 'date', 'open']].head(30))
 
-# ! First analysis of data
-
-# Process each file
-# Process each file
-for idx, filename in enumerate(unique_filenames):
-    df = data[data['filename'] == filename].reset_index(drop=True)
-
-    # Skip empty files
-    if df.empty:
-        continue
-
-    # clear_line()
-    # # Update progress bar for file processing
-    progress_bar_files.update(idx)
-
-    print(f"\nProcessing file: {filename}")
-    
-    # Convert 'open' column to numeric values
-    df['open'] = pd.to_numeric(df['open'], errors='coerce')
-
-    # Check if there are enough non-NaN values to perform the calculation
-    if len(df['open'].dropna()) > 1:
-        # Calculate percentage increase only if there are enough non-NaN values
-        df['percentage_increase'] = (df['open'].shift(-252) - df['open']) / df['open'] * 100
-
-        # Check if there are enough non-NaN values to perform quantile calculation
-        if len(df['percentage_increase'].dropna()) > 1:
-            # Define percentiles for categorization
-            percentiles = [0, 1, 10, 30, 50, 70, 90, 99, 100]
-
-            # Scale percentiles to be in the range [0, 1]
-            scaled_percentiles = [p / 100 for p in percentiles]
-
-            # Drop NaN values from the 'percentage_increase' column
-            df['percentage_increase'].dropna(inplace=True)
-
-            # Calculate quantiles
-            quantiles = df['percentage_increase'].quantile(q=scaled_percentiles, interpolation='linear')
-
-            # Print the values for debugging
-            print("scaled_percentiles:", scaled_percentiles)
-            print("quantiles:", quantiles)
-
-            # Remove duplicate quantile values
-            quantiles = quantiles[~quantiles.duplicated()]
-
-            # Print again for debugging
-            print("quantiles after removing duplicates:", quantiles)
-
-            # Ensure there are enough unique quantiles
-            if len(quantiles) < len(scaled_percentiles) - 1:
-                print("Not enough unique quantiles.")
-            else:
-                # Print for debugging
-                print("scaled_percentiles length:", len(scaled_percentiles))
-                print("quantiles length:", len(quantiles))
-                print("Labels length:", len(scaled_percentiles[:-1]))
-
-                # Categorize stocks based on reversed percentiles
-                df['percentile_category'] = pd.cut(
-                    df['percentage_increase'],
-                    bins=quantiles,
-                    labels=[
-                        f'Top {100 - p*100}%' if p > 0 else f'Bottom {-p*100}%'
-                        for p in scaled_percentiles[:-1]  # Use [:-1] to match the number of labels with the number of bin edges
-                    ]
-                )
-
-                # Group by percentile category and calculate average percentage increase
-                result = df.groupby('percentile_category', observed=False)['percentage_increase'].mean()
-
-                # Add result to the list
-                all_results.append((filename, result))
-        else:
-            print("Not enough non-NaN values for percentage increase.")
-    else:
-        print("Not enough non-NaN values for 'open' column.")
-
-# Print or use the results as needed
-categories_order = ['Bottom 1%', 'Bottom 10%', 'Bottom 30%', 'Bottom 50%', 'Top 50%', 'Top 30%', 'Top 10%', 'Top 1%']
-
-for filename, result in all_results:
-    print(f"Result for {filename}:")
-    # Print the results in the specified order
-    for category in categories_order:
-        print(f"{category}: {result.get(category, 'N/A')}")
-
-# Finish the progress bar
-progress_bar_files.finish()
-
-# ! Second analysis of data. 
+# ! Third analysis of data. 
 
 # Initialize result arrays
 increase_result_array = {}
