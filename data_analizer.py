@@ -5,10 +5,6 @@ from datetime import datetime, timedelta
 import sys
 import progressbar 
 
-def clear_line(): 
-    sys.stdout.write('\033[F')  # Move the cursor up one line
-    sys.stdout.write('\033[K')  # Clear the line
-
 # Path to the "Stocks" folder
 stocks_folder = "archive/Stocks"
 
@@ -102,7 +98,34 @@ def analize_streaks(df):
     # print(f"Analyzed {df['filename'].iloc[0]}")
     return patterns
 
+# Create a progress bar for file processing
+widgets_files = [progressbar.Percentage(), ' ', progressbar.Counter(), ' ',
+                    progressbar.Bar(), ' ', progressbar.Timer(), ' ']
+progress_bar_files = progressbar.ProgressBar(widgets=widgets_files, maxval=len(unique_filenames)).start()
+
 # ! First analysis of data
+
+for idx, filename in enumerate(data['filename'].unique()):
+    df = data[data['filename'] == filename].reset_index(drop=True)
+
+    # Skip empty files
+    if df.empty:
+        continue
+
+    # Update progress bar for file processing
+    progress_bar_files.update(idx + 1)
+
+# Finish the progress bar
+progress_bar_files.finish()
+
+# Sort the DataFrame by 'open' column in descending order
+sorted_data = data.sort_values(by='open', ascending=False)
+
+# Display the sorted results
+print(sorted_data[['filename', 'date', 'open']].head(30))
+
+
+# ! Second analysis of data
 
 # Define percentiles for categorization
 percentiles = [0, 1, 10, 30, 50, 70, 90, 99, 100]
@@ -176,33 +199,6 @@ if data['open'].notna().all():
 else:
     print("Some non-numeric values in the 'open' column.")
     
-    
-# Create a progress bar for file processing
-widgets_files = [progressbar.Percentage(), ' ', progressbar.Counter(), ' ',
-                    progressbar.Bar(), ' ', progressbar.Timer(), ' ']
-progress_bar_files = progressbar.ProgressBar(widgets=widgets_files, maxval=len(unique_filenames)).start()
-
-# ! Second analysis of data
-
-for idx, filename in enumerate(data['filename'].unique()):
-    df = data[data['filename'] == filename].reset_index(drop=True)
-
-    # Skip empty files
-    if df.empty:
-        continue
-
-    # Update progress bar for file processing
-    progress_bar_files.update(idx + 1)
-
-# Finish the progress bar
-progress_bar_files.finish()
-
-# Sort the DataFrame by 'open' column in descending order
-sorted_data = data.sort_values(by='open', ascending=False)
-
-# Display the sorted results
-print(sorted_data[['filename', 'date', 'open']].head(30))
-
 # ! Third analysis of data. 
 
 # Initialize result arrays
