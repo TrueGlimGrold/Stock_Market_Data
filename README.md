@@ -2,8 +2,6 @@
 
 Naturally money is one of the greatest things to have in this world. That is why when I set out to learn data analysis I started by analizing patterns in the stock market. I think that this is one of the harder things I could have done as a first project, as the data I had did not relate to individual stocks but rater patterns in stocks. 
 
-{Provide a link to your YouTube demonstration.  It should be a 4-5 minute demo of the data set, the questions and answers, the code running and a walkthrough of the code.}
-
 [Software Demo Video](https://youtu.be/cRKgCx2xxCE)
 
 # Data Analysis Results
